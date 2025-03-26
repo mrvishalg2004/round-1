@@ -64,7 +64,8 @@ export function getTokenFromRequest(request: Request): string | null {
   return null;
 }
 
-export function getTeamFromToken(request: Request): TeamInfo | null {
+// Renamed to avoid conflict
+export function getTeamInfoFromRequest(request: Request): TeamInfo | null {
   // Extract the token from the Authorization header
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
