@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FaArrowLeft, FaAward, FaClock, FaCheck, FaTimes, FaExclamationTriangle } from 'react-icons/fa';
+import { PageProps } from '@/types/next-page-types';
 
 interface TeamActivity {
   id: string;
@@ -42,11 +43,13 @@ interface Team {
   };
 }
 
-interface PageProps {
-  params: { id: string };
-}
+type TeamActivityPageProps = {
+  params: {
+    id: string;
+  };
+};
 
-export default function TeamActivity({ params }: PageProps) {
+export default function TeamActivity({ params }: TeamActivityPageProps) {
   const { id } = params;
   const router = useRouter();
   const [loading, setLoading] = useState(true);
