@@ -5,13 +5,15 @@ export async function safelyParseJSON(response: Response) {
   try {
     // First check if the response is ok
     if (!response.ok) {
-      // Try to get error information if available as JSON
+      // Try to get error information
+      const errorText = await response.text();
+      
       try {
-        const errorData = await response.json();
+        // Try to parse as JSON
+        const errorData = JSON.parse(errorText);
         throw new Error(errorData.error || `API error: ${response.status}`);
       } catch (jsonError) {
-        // If JSON parsing fails, use text or status
-        const errorText = await response.text();
+        // If JSON parsing fails, use the raw text
         throw new Error(errorText || `API error: ${response.status}`);
       }
     }
