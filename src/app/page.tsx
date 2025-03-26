@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { FaArrowRight, FaUsers, FaLock, FaCode } from 'react-icons/fa';
+import { FaArrowRight, FaUsers, FaLock, FaCode, FaSync } from 'react-icons/fa';
 import { safelyParseJSON } from '@/lib/apiHelpers';
 
 export default function Home() {
@@ -13,18 +13,18 @@ export default function Home() {
   const [member2, setMember2] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
+  const [showRetry, setShowRetry] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    
-    if (!teamName.trim() || !member1.trim() || !member2.trim()) {
-      setError('Please fill all the fields');
-      return;
-    }
-    
+  const registerTeam = async () => {
     try {
       setIsRegistering(true);
+      setError('');
+      setShowRetry(false);
+      
+      // Add a client-side timeout to prevent UI from hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
       const response = await fetch('/api/auth/register', {
         method: 'POST',
@@ -35,7 +35,10 @@ export default function Home() {
           teamName,
           members: [member1, member2],
         }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId); // Clear the timeout if we get a response
       
       const data = await safelyParseJSON(response);
       
@@ -50,10 +53,37 @@ export default function Home() {
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Registration error:', error);
-      setError(error.message || 'Something went wrong. Please try again.');
+      
+      // Handle different error cases
+      if (error.name === 'AbortError') {
+        setError('Registration request timed out. Please try again.');
+        setShowRetry(true);
+      } else if (error.message?.includes('FUNCTION_INVOCATION_TIMEOUT')) {
+        setError('Server took too long to respond. Please try again.');
+        setShowRetry(true);
+      } else {
+        setError(error.message || 'Something went wrong. Please try again.');
+      }
     } finally {
       setIsRegistering(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!teamName.trim() || !member1.trim() || !member2.trim()) {
+      setError('Please fill all the fields');
+      return;
+    }
+    
+    await registerTeam();
+  };
+
+  // Retry registration
+  const handleRetry = async () => {
+    setRetryCount(prev => prev + 1);
+    await registerTeam();
   };
 
   return (
@@ -135,6 +165,14 @@ export default function Home() {
           {error && (
             <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded mb-6">
               {error}
+              {showRetry && (
+                <button 
+                  onClick={handleRetry}
+                  className="mt-2 w-full bg-red-800 hover:bg-red-700 py-2 rounded flex items-center justify-center"
+                >
+                  <FaSync className="mr-2" /> Try Again ({retryCount + 1})
+                </button>
+              )}
             </div>
           )}
           
