@@ -10,7 +10,7 @@
     }
   ],
   "functions": {
-    "api/**/*": {
+    "src/app/api/**/*": {
       "memory": 1024,
       "maxDuration": 10
     }
