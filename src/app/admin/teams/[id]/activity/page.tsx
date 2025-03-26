@@ -4,8 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FaArrowLeft, FaAward, FaClock, FaCheck, FaTimes, FaExclamationTriangle } from 'react-icons/fa';
-import { PageProps } from '@/types/next-page-types';
-import { safelyParseJSON } from '@/lib/apiHelpers';
 
 interface TeamActivity {
   id: string;
@@ -44,13 +42,11 @@ interface Team {
   };
 }
 
-type TeamActivityPageProps = {
-  params: {
-    id: string;
-  };
-};
+interface PageProps {
+  params: { id: string };
+}
 
-export default function TeamActivity({ params }: TeamActivityPageProps) {
+export default function TeamActivity({ params }: PageProps) {
   const { id } = params;
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -72,8 +68,12 @@ export default function TeamActivity({ params }: TeamActivityPageProps) {
         setLoading(true);
         const response = await fetch(`/api/teams/${id}/activity`);
         
-        // Use the safe parsing helper instead of direct response.json()
-        const data = await safelyParseJSON(response);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch team activity');
+        }
+        
+        const data = await response.json();
         
         if (data.team) {
           setTeam(data.team);
@@ -88,7 +88,7 @@ export default function TeamActivity({ params }: TeamActivityPageProps) {
         }
       } catch (error) {
         console.error('Error fetching team activity:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load team activity data');
+        setError('Failed to load team activity data');
       } finally {
         setLoading(false);
       }

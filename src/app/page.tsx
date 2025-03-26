@@ -1,104 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { FaArrowRight, FaUsers, FaLock, FaCode, FaSync } from 'react-icons/fa';
-import { safelyParseJSON } from '@/lib/apiHelpers';
+import { FaArrowRight, FaUsers, FaLock, FaCode } from 'react-icons/fa';
+import { toast } from 'react-hot-toast';
 
 export default function Home() {
   const router = useRouter();
-  const [teamName, setTeamName] = useState('');
-  const [member1, setMember1] = useState('');
-  const [member2, setMember2] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [error, setError] = useState('');
-  const [retryCount, setRetryCount] = useState(0);
-  const [showRetry, setShowRetry] = useState(false);
+  const [gameStatus, setGameStatus] = useState({ isStarted: false });
+  const [checking, setChecking] = useState(false);
 
-  const registerTeam = async () => {
-    try {
-      setIsRegistering(true);
-      setError('');
-      setShowRetry(false);
-      
-      // Add a client-side timeout to prevent UI from hanging
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout (increased)
-      
-      // For development, log the request details
-      console.log('Registering team:', { teamName, members: [member1, member2] });
-      
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          teamName,
-          members: [member1, member2],
-        }),
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId); // Clear the timeout if we get a response
-      
-      // For development, log the raw response
-      console.log('Registration response status:', response.status);
-      
+  useEffect(() => {
+    const fetchGameStatus = async () => {
       try {
-        const data = await safelyParseJSON(response);
-        console.log('Registration response data:', data);
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to register');
+        const response = await fetch('/api/admin/game-status');
+        if (response.ok) {
+          const data = await response.json();
+          setGameStatus(data);
         }
-        
-        // Set auth token in cookie
-        document.cookie = `auth_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}`; // 1 week
-        
-        // Redirect to dashboard
-        router.push('/dashboard');
-      } catch (parseError) {
-        console.error('Error parsing response:', parseError);
-        throw new Error('Failed to parse server response');
+      } catch (error) {
+        console.error('Error fetching game status:', error);
       }
-    } catch (error: any) {
-      console.error('Registration error:', error);
-      
-      // Handle different error cases
-      if (error.name === 'AbortError') {
-        setError('Registration request timed out. Please try again.');
-        setShowRetry(true);
-      } else if (error.message?.includes('FUNCTION_INVOCATION_TIMEOUT') || 
-                error.message?.includes('timed out') || 
-                error.message?.includes('timeout')) {
-        setError('Server took too long to respond. Please try again.');
-        setShowRetry(true);
-      } else {
-        setError(`${error.message || 'Something went wrong. Please try again.'}`);
-        setShowRetry(true);
+    };
+
+    fetchGameStatus();
+  }, []);
+
+  const handleStartGame = async () => {
+    setChecking(true);
+    try {
+      const response = await fetch('/api/admin/game-status');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.isStarted) {
+          router.push('/dashboard');
+        } else {
+          toast.error('The game has not been started by the admin yet. Please wait.');
+        }
       }
+    } catch (error) {
+      console.error('Error checking game status:', error);
+      toast.error('Failed to check game status');
     } finally {
-      setIsRegistering(false);
+      setChecking(false);
     }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!teamName.trim() || !member1.trim() || !member2.trim()) {
-      setError('Please fill all the fields');
-      return;
-    }
-    
-    await registerTeam();
-  };
-
-  // Retry registration
-  const handleRetry = async () => {
-    setRetryCount(prev => prev + 1);
-    await registerTeam();
   };
 
   return (
@@ -115,7 +61,6 @@ export default function Home() {
           </h1>
           <p className="text-xl text-gray-300 max-w-2xl mx-auto">
             An interactive digital treasure hunt where technology meets mystery.
-            Register your team and test your skills across three challenging rounds.
           </p>
         </motion.div>
         
@@ -173,75 +118,20 @@ export default function Home() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.5 }}
-          className="max-w-md mx-auto bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700"
+          className="max-w-md mx-auto mt-12"
         >
-          <h2 className="text-2xl font-bold mb-6 text-center">Register Your Team</h2>
-          
-          {error && (
-            <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded mb-6">
-              {error}
-              {showRetry && (
-                <button 
-                  onClick={handleRetry}
-                  className="mt-2 w-full bg-red-800 hover:bg-red-700 py-2 rounded flex items-center justify-center"
-                >
-                  <FaSync className="mr-2" /> Try Again ({retryCount + 1})
-                </button>
-              )}
-            </div>
+          <button
+            onClick={gameStatus.isStarted ? () => router.push('/dashboard') : () => toast.error('The game has not been started by the admin yet. Please wait.')}
+            disabled={!gameStatus.isStarted || checking}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 px-8 rounded-lg font-bold text-xl flex items-center justify-center disabled:opacity-50"
+          >
+            {checking ? 'Checking...' : 'Start Game'} <FaArrowRight className="ml-2" />
+          </button>
+          {!gameStatus.isStarted && (
+            <p className="text-amber-400 italic mt-3 text-center">
+              Waiting for admin to start the game. Button will be enabled once the game begins.
+            </p>
           )}
-          
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label htmlFor="teamName" className="block mb-2 font-medium">
-                Team Name
-              </label>
-              <input
-                type="text"
-                id="teamName"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded p-3 text-white"
-                placeholder="Enter your team name"
-              />
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="member1" className="block mb-2 font-medium">
-                Team Member 1
-              </label>
-              <input
-                type="text"
-                id="member1"
-                value={member1}
-                onChange={(e) => setMember1(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded p-3 text-white"
-                placeholder="Enter name of first member"
-              />
-            </div>
-            
-            <div className="mb-6">
-              <label htmlFor="member2" className="block mb-2 font-medium">
-                Team Member 2
-              </label>
-              <input
-                type="text"
-                id="member2"
-                value={member2}
-                onChange={(e) => setMember2(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded p-3 text-white"
-                placeholder="Enter name of second member"
-              />
-            </div>
-            
-            <button
-              type="submit"
-              disabled={isRegistering}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold flex items-center justify-center disabled:opacity-70"
-            >
-              {isRegistering ? 'Registering...' : 'Start the Hunt!'} {!isRegistering && <FaArrowRight className="ml-2" />}
-            </button>
-          </form>
         </motion.div>
       </div>
     </div>

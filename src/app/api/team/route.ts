@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import { extractTeamFromRequest } from '@/utils/authRequest';
+import { getTeamFromToken } from '@/utils/auth';
 import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
   try {
     // Get team from token
-    const team = extractTeamFromRequest(request);
+    const team = getTeamFromToken(request);
     
     if (!team) {
       return NextResponse.json(

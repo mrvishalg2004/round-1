@@ -1,81 +1,116 @@
-// Mock database for development/testing when MongoDB is not available
+// This file provides a mock database for local development without MongoDB
 import { nanoid } from 'nanoid';
 
-interface Team {
-  _id: string;
-  name: string;
-  members: string[];
-  createdAt: Date;
-  completedRounds: {
-    round1: boolean;
-    round2: boolean;
-    round3: boolean;
-  };
-  score: number;
-  disqualified: boolean;
-  lastActive: Date;
-}
-
-interface GameState {
-  teamId: string;
-  round1Attempts: number;
-  round2Attempts: number;
-  round3Attempts: number;
-  hintsUsed: number;
-  startTime: Date;
-  endTime: Date | null;
-}
-
 // In-memory storage
-const teams: Team[] = [];
-const games: GameState[] = [];
+const teams = new Map();
+const games = new Map();
+const challenges = new Map();
 
-// Mock database methods
-export const mockDb = {
-  collection: (name: string) => {
-    switch (name) {
-      case 'teams':
-        return {
-          findOne: (query: any) => {
-            const { name } = query;
-            return Promise.resolve(teams.find(team => team.name === name) || null);
-          },
-          insertOne: (doc: Team) => {
-            teams.push(doc);
-            return Promise.resolve({ insertedId: doc._id });
-          },
-          find: () => {
-            return {
-              toArray: () => Promise.resolve([...teams])
-            };
+// Mock collections
+export const collections = {
+  teams: {
+    findOne: async (query: any) => {
+      if (query._id) {
+        return teams.get(query._id) || null;
+      }
+      if (query.name) {
+        return Array.from(teams.values()).find(team => team.name === query.name) || null;
+      }
+      return null;
+    },
+    insertOne: async (doc: any) => {
+      teams.set(doc._id, doc);
+      return { insertedId: doc._id };
+    },
+    updateOne: async (query: any, update: any) => {
+      if (query._id) {
+        const team = teams.get(query._id);
+        if (team) {
+          const updatedTeam = { ...team };
+          if (update.$set) {
+            Object.assign(updatedTeam, update.$set);
           }
-        };
-      case 'games':
-        return {
-          findOne: (query: any) => {
-            const { teamId } = query;
-            return Promise.resolve(games.find(game => game.teamId === teamId) || null);
-          },
-          insertOne: (doc: GameState) => {
-            games.push(doc);
-            return Promise.resolve({ insertedId: doc.teamId });
+          teams.set(query._id, updatedTeam);
+          return { modifiedCount: 1 };
+        }
+      }
+      return { modifiedCount: 0 };
+    },
+    find: async (query: any = {}) => {
+      const results = Array.from(teams.values());
+      // Return object with toArray method to simulate MongoDB cursor
+      return {
+        toArray: async () => results
+      };
+    }
+  },
+  games: {
+    findOne: async (query: any) => {
+      if (query.teamId) {
+        return games.get(query.teamId) || null;
+      }
+      return null;
+    },
+    insertOne: async (doc: any) => {
+      games.set(doc.teamId, doc);
+      return { insertedId: doc.teamId };
+    },
+    updateOne: async (query: any, update: any) => {
+      if (query.teamId) {
+        const game = games.get(query.teamId);
+        if (game) {
+          const updatedGame = { ...game };
+          if (update.$set) {
+            Object.assign(updatedGame, update.$set);
           }
-        };
-      default:
-        return {
-          findOne: () => Promise.resolve(null),
-          insertOne: () => Promise.resolve({ insertedId: nanoid() }),
-          find: () => ({
-            toArray: () => Promise.resolve([])
-          })
-        };
+          if (update.$inc) {
+            Object.entries(update.$inc).forEach(([key, value]) => {
+              updatedGame[key] = (updatedGame[key] || 0) + Number(value);
+            });
+          }
+          games.set(query.teamId, updatedGame);
+          return { modifiedCount: 1 };
+        }
+      }
+      return { modifiedCount: 0 };
+    }
+  },
+  challenges: {
+    findOne: async (query: any) => {
+      if (query._id) {
+        return challenges.get(query._id) || null;
+      }
+      return null;
+    },
+    insertOne: async (doc: any) => {
+      challenges.set(doc._id, doc);
+      return { insertedId: doc._id };
+    },
+    find: async () => {
+      const results = Array.from(challenges.values());
+      return {
+        toArray: async () => results
+      };
     }
   }
 };
 
-// Export mock client and db
-export const mockClient = {
-  close: () => Promise.resolve()
+// Mock database connection
+export const mockDb = {
+  collection: (name: string) => {
+    return collections[name as keyof typeof collections] || {
+      findOne: async () => null,
+      insertOne: async () => ({ insertedId: nanoid() }),
+      updateOne: async () => ({ modifiedCount: 0 }),
+      find: async () => ({ toArray: async () => [] })
+    };
+  }
 };
 
-export default { mockDb, mockClient }; 
+// Mock database connection function
+export async function connectToMockDatabase() {
+  return {
+    client: null,
+    db: mockDb
+  };
+} 

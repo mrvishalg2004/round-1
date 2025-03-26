@@ -28,7 +28,7 @@ export function generateToken(teamId: string, teamName: string): string {
  * @param request The request object containing authorization header
  * @returns The team data payload
  */
-export function extractTeamFromToken(request: Request): TeamInfo | null {
+export function getTeamFromToken(request: Request): TeamInfo | null {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
@@ -86,7 +86,7 @@ export function validateToken(token: string): boolean {
  */
 export async function getTeamFromRequest(request: Request): Promise<TeamInfo | null> {
   // First try to get team from token in header
-  const teamFromToken = extractTeamFromToken(request);
+  const teamFromToken = getTeamFromToken(request);
   if (teamFromToken) {
     return teamFromToken;
   }
