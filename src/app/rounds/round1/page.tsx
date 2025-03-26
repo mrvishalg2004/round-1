@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import confetti from 'canvas-confetti';
 import styles from './Round1.module.css';
+import { safelyParseJSON } from '@/lib/apiHelpers';
 
 // Create a safe confetti function in case the import fails
 const safeConfetti = (options: any) => {

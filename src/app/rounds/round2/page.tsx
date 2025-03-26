@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FaLightbulb, FaArrowRight, FaCode, FaCheck, FaTimes } from 'react-icons/fa';
 import dynamic from 'next/dynamic';
+import { safelyParseJSON } from '@/lib/apiHelpers';
 
 // Dynamically import AceEditor to avoid SSR issues
 const AceEditor = dynamic(

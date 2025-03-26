@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FaArrowRight, FaUsers, FaLock, FaCode } from 'react-icons/fa';
+import { safelyParseJSON } from '@/lib/apiHelpers';
 
 export default function Home() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function Home() {
         }),
       });
       
-      const data = await response.json();
+      const data = await safelyParseJSON(response);
       
       if (!response.ok) {
         throw new Error(data.error || 'Failed to register');
