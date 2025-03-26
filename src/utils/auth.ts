@@ -60,6 +60,7 @@ export function getTokenFromRequest(request: Request): string | null {
   return null;
 }
 
+// IMPORTANT: This is the revised function that replaces getTeamFromToken
 // Extract team info from request (using Authorization header)
 export function extractTeamFromRequest(request: Request): TeamInfo | null {
   // Extract the token from the Authorization header
@@ -107,7 +108,7 @@ export function extractTeamFromCookies(cookies: any): { id: string; name: string
 }
 
 // Client-side: Get team info from cookie
-export function getTeamInfo(): TeamInfo | null {
+export function getTeamInfo(): { id: string; name: string; token?: string } | null {
   try {
     if (typeof document === 'undefined') return null;
     

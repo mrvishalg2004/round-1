@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import { extractTeamFromRequest } from '@/utils/auth';
+import { extractTeamFromRequest } from '@/utils/authRequest';
 import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
