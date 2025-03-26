@@ -24,7 +24,10 @@ export default function Home() {
       
       // Add a client-side timeout to prevent UI from hanging
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout (increased)
+      
+      // For development, log the request details
+      console.log('Registering team:', { teamName, members: [member1, member2] });
       
       const response = await fetch('/api/auth/register', {
         method: 'POST',
@@ -40,17 +43,26 @@ export default function Home() {
       
       clearTimeout(timeoutId); // Clear the timeout if we get a response
       
-      const data = await safelyParseJSON(response);
+      // For development, log the raw response
+      console.log('Registration response status:', response.status);
       
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to register');
+      try {
+        const data = await safelyParseJSON(response);
+        console.log('Registration response data:', data);
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to register');
+        }
+        
+        // Set auth token in cookie
+        document.cookie = `auth_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}`; // 1 week
+        
+        // Redirect to dashboard
+        router.push('/dashboard');
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        throw new Error('Failed to parse server response');
       }
-      
-      // Set auth token in cookie
-      document.cookie = `auth_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}`; // 1 week
-      
-      // Redirect to dashboard
-      router.push('/dashboard');
     } catch (error: any) {
       console.error('Registration error:', error);
       
@@ -58,11 +70,14 @@ export default function Home() {
       if (error.name === 'AbortError') {
         setError('Registration request timed out. Please try again.');
         setShowRetry(true);
-      } else if (error.message?.includes('FUNCTION_INVOCATION_TIMEOUT')) {
+      } else if (error.message?.includes('FUNCTION_INVOCATION_TIMEOUT') || 
+                error.message?.includes('timed out') || 
+                error.message?.includes('timeout')) {
         setError('Server took too long to respond. Please try again.');
         setShowRetry(true);
       } else {
-        setError(error.message || 'Something went wrong. Please try again.');
+        setError(`${error.message || 'Something went wrong. Please try again.'}`);
+        setShowRetry(true);
       }
     } finally {
       setIsRegistering(false);

@@ -3,22 +3,55 @@ import jwt from 'jsonwebtoken';
 // Remove server-side imports - this is a client-side utility file
 // import { cookies } from 'next/headers';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'https-find-secret-key-dev';
+// Get secret from environment or use fallback
+const JWT_SECRET = process.env.JWT_SECRET || 'default-development-secret-do-not-use-in-production';
 
 export interface TokenPayload {
   teamId: string;
   teamName: string;
 }
 
-export function generateToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+// Generate JWT token
+export function generateToken(payload: any): string {
+  try {
+    return jwt.sign(payload, JWT_SECRET, {
+      expiresIn: '7d' // Token expires in 7 days
+    });
+  } catch (error) {
+    console.error('Error generating token:', error);
+    // Return a dummy token for development
+    return `dev-token-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+  }
 }
 
-export function verifyToken(token: string): TokenPayload | null {
+// Verify JWT token
+export function verifyToken(token: string): any {
   try {
-    return jwt.verify(token, JWT_SECRET) as TokenPayload;
+    return jwt.verify(token, JWT_SECRET);
   } catch (error) {
-    console.error('Token verification error:', error);
+    return null;
+  }
+}
+
+// Extract team ID from token
+export function getTeamFromToken(token: string): string | null {
+  try {
+    const decoded = verifyToken(token);
+    return decoded?.teamId || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Extract team info from cookies
+export function extractTeamFromCookies(cookies: any): { id: string; name: string } | null {
+  try {
+    const teamCookie = cookies.get('team')?.value;
+    if (!teamCookie) return null;
+    
+    const team = JSON.parse(teamCookie);
+    return team.id && team.name ? { id: team.id, name: team.name } : null;
+  } catch (error) {
     return null;
   }
 }
