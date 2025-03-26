@@ -11,6 +11,14 @@ export interface TokenPayload {
   teamName: string;
 }
 
+export interface TeamInfo {
+  id: string;
+  name: string;
+  teamId?: string;
+  teamName?: string;
+  token?: string;
+}
+
 // Generate JWT token
 export function generateToken(payload: any): string {
   try {
@@ -33,8 +41,8 @@ export function verifyToken(token: string): any {
   }
 }
 
-// Extract team ID from token
-export function getTeamFromToken(token: string): string | null {
+// Extract team ID from token string
+export function extractTeamIdFromToken(token: string): string | null {
   try {
     const decoded = verifyToken(token);
     return decoded?.teamId || null;
@@ -43,7 +51,49 @@ export function getTeamFromToken(token: string): string | null {
   }
 }
 
-// Extract team info from cookies
+// Extract token from request headers
+export function getTokenFromRequest(request: Request): string | null {
+  const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return null;
+}
+
+// Extract team info from request (using Authorization header)
+export function extractTeamFromRequest(request: Request): TeamInfo | null {
+  // Extract the token from the Authorization header
+  const token = getTokenFromRequest(request);
+  if (!token) {
+    return null;
+  }
+  
+  try {
+    // For client-side, we just need to return the token info
+    // The actual verification happens on the server
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return {
+        id: 'client-team',
+        name: 'Client Team',
+        token
+      };
+    }
+    
+    return {
+      id: decoded.teamId || decoded.id || 'unknown',
+      name: decoded.teamName || decoded.name || 'Unknown Team',
+      teamId: decoded.teamId || decoded.id,
+      teamName: decoded.teamName || decoded.name,
+      token
+    };
+  } catch (error) {
+    console.error('Error processing token:', error);
+    return null;
+  }
+}
+
+// Extract team info from cookies on client side
 export function extractTeamFromCookies(cookies: any): { id: string; name: string } | null {
   try {
     const teamCookie = cookies.get('team')?.value;
@@ -56,52 +106,11 @@ export function extractTeamFromCookies(cookies: any): { id: string; name: string
   }
 }
 
-export function getTokenFromRequest(request: Request): string | null {
-  const authHeader = request.headers.get('authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7);
-  }
-  return null;
-}
-
-// Renamed to avoid conflict
-export function getTeamInfoFromRequest(request: Request): TeamInfo | null {
-  // Extract the token from the Authorization header
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-  
-  const token = authHeader.substring(7);
-  if (!token) {
-    return null;
-  }
-  
-  try {
-    // For client-side, we just need to return the token info
-    // The actual verification happens on the server
-    return {
-      id: 'client-team',
-      name: 'Client Team',
-      token
-    };
-  } catch (error) {
-    console.error('Error processing token:', error);
-    return null;
-  }
-}
-
-// Client-side authentication utilities
-
-interface TeamInfo {
-  id: string;
-  name: string;
-  token?: string;
-}
-
-// Get team info from cookie
+// Client-side: Get team info from cookie
 export function getTeamInfo(): TeamInfo | null {
   try {
+    if (typeof document === 'undefined') return null;
+    
     const cookies = document.cookie.split(';');
     const teamCookie = cookies.find(cookie => cookie.trim().startsWith('team='));
     
@@ -116,9 +125,11 @@ export function getTeamInfo(): TeamInfo | null {
   }
 }
 
-// Check if the user has completed a specific round
+// Client-side: Check if a round is completed
 export function hasCompletedRound(roundName: string): boolean {
   try {
+    if (typeof document === 'undefined') return false;
+    
     const cookies = document.cookie.split(';');
     const roundCookie = cookies.find(cookie => cookie.trim().startsWith(`${roundName}_completed=`));
     return roundCookie?.split('=')[1] === 'true';
