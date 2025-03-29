@@ -3,12 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { FaUsers, FaSignOutAlt, FaLock, FaPlay, FaStop, FaCheckCircle, FaTimesCircle, FaTrash, FaRedo, FaBan } from 'react-icons/fa';
+import { FaUsers, FaSignOutAlt, FaLock, FaPlay, FaStop, FaCheckCircle, FaTimesCircle, FaTrash, FaRedo, FaBan, FaTrophy, FaThumbsDown, FaClock, FaPause } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 
 interface GameStatus {
   isStarted: boolean;
   startTime?: string;
+  timerStartedAt: number | null;
+  timerPausedAt: number | null;
+  isTimerRunning: boolean;
+  timerDuration: number;
 }
 
 interface Team {
@@ -23,6 +27,8 @@ interface Team {
   score?: number;
   lastActive?: string;
   disqualified?: boolean;
+  isWinner?: boolean;
+  isLoser?: boolean;
 }
 
 export default function AdminPanel() {
@@ -70,25 +76,25 @@ export default function AdminPanel() {
       };
 
       // Fetch teams
-      const fetchTeams = async () => {
-        setTeamsLoading(true);
-        try {
-          const response = await fetch('/api/teams');
-          if (response.ok) {
-            const data = await response.json();
-            setTeams(data.teams || []);
-          }
-        } catch (error) {
-          console.error('Error fetching teams:', error);
-        } finally {
-          setTeamsLoading(false);
-        }
-      };
-
-      fetchGameStatus();
       fetchTeams();
+      fetchGameStatus();
     }
   }, [isAuthenticated]);
+
+  const fetchTeams = async () => {
+    setTeamsLoading(true);
+    try {
+      const response = await fetch('/api/teams');
+      if (response.ok) {
+        const data = await response.json();
+        setTeams(data.teams || []);
+      }
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+    } finally {
+      setTeamsLoading(false);
+    }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -238,36 +244,25 @@ export default function AdminPanel() {
     }
   };
 
-  const handleDeleteTeam = async (teamId: string) => {
+  const handleDeleteTeam = async (id: string) => {
     try {
-      if (deleteTeamId === teamId) {
-        // Confirmed deletion
-        const response = await fetch(`/api/teams?id=${teamId}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
+      const response = await fetch(`/api/teams?id=${id}`, {
+        method: 'DELETE',
+      });
 
-        if (!response.ok) {
-          throw new Error('Failed to delete team');
-        }
-
-        // Remove from local state
-        setTeams(prevTeams => prevTeams.filter(team => team.id !== teamId));
-        
-        toast.success('Team deleted successfully');
+      if (response.ok) {
+        // Remove the team from local state
+        setTeams(teams.filter(team => team.id !== id));
         setDeleteTeamId(null);
+        toast.success('Team deleted successfully');
       } else {
-        // Ask for confirmation
-        setDeleteTeamId(teamId);
-        // Clear any other confirmations
-        setDisqualifyTeamId(null);
+        const errorData = await response.json();
+        console.error('Error deleting team:', errorData);
+        toast.error(`Failed to delete team: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error deleting team:', error);
-      toast.error('Failed to delete team');
-      setDeleteTeamId(null);
+      toast.error('An error occurred while deleting the team');
     }
   };
 
@@ -279,8 +274,81 @@ export default function AdminPanel() {
     setDeleteTeamId(null);
   };
 
+  const handleConfirmDelete = (id: string) => {
+    setDeleteTeamId(id);
+  };
+
   const handleCancelReset = () => {
     setResetConfirm(false);
+  };
+
+  const handleStartTimer = async () => {
+    try {
+      const response = await fetch('/api/admin/game-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ startTimer: true })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to start timer');
+      }
+
+      const data = await response.json();
+      setGameStatus(data);
+      toast.success('Timer started successfully!');
+    } catch (error) {
+      console.error('Error starting timer:', error);
+      toast.error('Failed to start timer');
+    }
+  };
+
+  const handlePauseTimer = async () => {
+    try {
+      const response = await fetch('/api/admin/game-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pauseTimer: true })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to pause timer');
+      }
+
+      const data = await response.json();
+      setGameStatus(data);
+      toast.success('Timer paused successfully!');
+    } catch (error) {
+      console.error('Error pausing timer:', error);
+      toast.error('Failed to pause timer');
+    }
+  };
+
+  const handleResetTimer = async () => {
+    try {
+      const response = await fetch('/api/admin/game-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ resetTimer: true })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reset timer');
+      }
+
+      const data = await response.json();
+      setGameStatus(data);
+      toast.success('Timer reset successfully!');
+    } catch (error) {
+      console.error('Error resetting timer:', error);
+      toast.error('Failed to reset timer');
+    }
   };
 
   // Login page
@@ -366,7 +434,7 @@ export default function AdminPanel() {
           </motion.button>
         </div>
         
-        {/* Game Control - Now with reset game button */}
+        {/* Game Control - Now with timer controls */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -418,9 +486,51 @@ export default function AdminPanel() {
               )}
             </div>
           </div>
-          <p className="text-gray-400 text-sm">
+          <p className="text-gray-400 text-sm mb-4">
             Reset will clear all team progress and scores. This action cannot be undone.
           </p>
+          
+          {/* Timer Controls */}
+          <div className="mt-6 border-t border-gray-700 pt-4">
+            <h3 className="text-xl font-bold flex items-center mb-4">
+              <FaClock className="mr-2 text-blue-400" /> Timer Controls
+            </h3>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex space-x-3">
+                {!gameStatus.isTimerRunning ? (
+                  <button
+                    onClick={handleStartTimer}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center"
+                  >
+                    <FaPlay className="mr-2" /> Start Timer
+                  </button>
+                ) : (
+                  <button
+                    onClick={handlePauseTimer}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded flex items-center"
+                  >
+                    <FaPause className="mr-2" /> Pause Timer
+                  </button>
+                )}
+                
+                <button
+                  onClick={handleResetTimer}
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded flex items-center"
+                >
+                  <FaRedo className="mr-2" /> Reset Timer
+                </button>
+              </div>
+              
+              <div className="bg-gray-900 px-4 py-2 rounded-lg font-mono text-2xl">
+                {formatTimerDisplay(gameStatus)}
+              </div>
+            </div>
+            
+            <p className="text-gray-400 text-sm mt-2">
+              The timer will be displayed to all players when active. Players will see a 10-minute countdown.
+            </p>
+          </div>
         </motion.div>
         
         {/* Team List - With disqualification and delete options */}
@@ -449,40 +559,146 @@ export default function AdminPanel() {
               {teams.map(team => (
                 <div 
                   key={team.id}
-                  className={`bg-gray-700 p-5 rounded-lg hover:bg-gray-600 transition-colors border ${team.disqualified ? 'border-red-600' : 'border-gray-600'}`}
+                  className="bg-gray-700 rounded-lg p-5 mb-4 relative"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className={`font-medium text-xl ${team.disqualified ? 'text-red-300 line-through' : 'text-blue-300'}`}>
-                      {team.name}
-                    </h3>
-                    <div className="flex space-x-2">
-                      {/* Disqualify button */}
-                      {team.disqualified ? (
-                        <span className="bg-red-900 text-red-200 text-xs px-2 py-1 rounded-full">Disqualified</span>
-                      ) : disqualifyTeamId === team.id ? (
-                        <div className="flex space-x-1">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center">
+                        <h3 className="text-lg font-semibold">
+                          {team.disqualified && <span className="text-red-500 mr-2">⛔</span>}
+                          {team.isWinner && <span className="text-yellow-500 mr-2">🏆</span>}
+                          {team.isLoser && <span className="text-gray-500 mr-2">👎</span>}
+                          {team.name}
+                        </h3>
+                        
+                        {team.disqualified && (
+                          <span className="ml-3 bg-red-900/50 text-red-300 text-xs px-2 py-0.5 rounded">
+                            Disqualified
+                          </span>
+                        )}
+                        
+                        {team.isWinner && (
+                          <span className="ml-3 bg-yellow-900/50 text-yellow-300 text-xs px-2 py-0.5 rounded">
+                            Winner
+                          </span>
+                        )}
+                        
+                        {team.isLoser && (
+                          <span className="ml-3 bg-gray-800 text-gray-300 text-xs px-2 py-0.5 rounded">
+                            Loser
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Score display */}
+                      <div className="mt-1 text-sm text-blue-300">
+                        Score: {team.score || 0} points
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      {/* Status toggles */}
+                      <div className="flex space-x-2 mr-4">
+                        <div 
+                          className={`w-5 h-5 rounded border cursor-pointer flex items-center justify-center ${team.isWinner ? 'bg-yellow-500 border-yellow-600' : 'bg-gray-700 border-gray-600 hover:bg-gray-600'}`}
+                          onClick={async () => {
+                            try {
+                              const response = await fetch('/api/admin/update-team-status', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ teamId: team.id, isWinner: !team.isWinner })
+                              });
+                              if (response.ok) {
+                                toast.success(`Team ${!team.isWinner ? 'marked as winner' : 'unmarked as winner'}`);
+                                // Refresh teams data after update
+                                fetchTeams();
+                              }
+                            } catch (error) {
+                              console.error('Error updating team status:', error);
+                              toast.error('Failed to update team status');
+                            }
+                          }}
+                          title="Toggle Winner Status"
+                        >
+                          {team.isWinner && <FaTrophy className="text-white text-xs" />}
+                        </div>
+                        
+                        <div 
+                          className={`w-5 h-5 rounded border cursor-pointer flex items-center justify-center ${team.isLoser ? 'bg-gray-500 border-gray-600' : 'bg-gray-700 border-gray-600 hover:bg-gray-600'}`}
+                          onClick={async () => {
+                            try {
+                              const response = await fetch('/api/admin/update-team-status', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ teamId: team.id, isLoser: !team.isLoser })
+                              });
+                              if (response.ok) {
+                                toast.success(`Team ${!team.isLoser ? 'marked as loser' : 'unmarked as loser'}`);
+                                // Refresh teams data after update
+                                fetchTeams();
+                              }
+                            } catch (error) {
+                              console.error('Error updating team status:', error);
+                              toast.error('Failed to update team status');
+                            }
+                          }}
+                          title="Toggle Loser Status"
+                        >
+                          {team.isLoser && <FaThumbsDown className="text-white text-xs" />}
+                        </div>
+                        
+                        <div 
+                          className={`w-5 h-5 rounded border cursor-pointer flex items-center justify-center ${team.disqualified ? 'bg-red-500 border-red-600' : 'bg-gray-700 border-gray-600 hover:bg-gray-600'}`}
+                          onClick={async () => {
+                            try {
+                              const response = await fetch('/api/admin/update-team-status', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ teamId: team.id, disqualified: !team.disqualified })
+                              });
+                              if (response.ok) {
+                                toast.success(`Team ${!team.disqualified ? 'disqualified' : 'requalified'}`);
+                                // Refresh teams data after update
+                                fetchTeams();
+                              }
+                            } catch (error) {
+                              console.error('Error updating team status:', error);
+                              toast.error('Failed to update team status');
+                            }
+                          }}
+                          title="Toggle Disqualification"
+                        >
+                          {team.disqualified && <FaBan className="text-white text-xs" />}
+                        </div>
+                      </div>
+                      
+                      {/* Disqualify button (original one) - hiding this since we have a toggle now */}
+                      <div className="hidden">
+                        {disqualifyTeamId === team.id ? (
+                          <div className="flex space-x-1 ml-2">
+                            <button 
+                              onClick={() => handleDisqualifyTeam(team.id)}
+                              className="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded"
+                            >
+                              Confirm
+                            </button>
+                            <button 
+                              onClick={handleCancelDisqualify}
+                              className="bg-gray-600 hover:bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
                           <button 
                             onClick={() => handleDisqualifyTeam(team.id)}
-                            className="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded"
+                            className={`text-${team.disqualified ? 'green' : 'red'}-400 hover:text-${team.disqualified ? 'green' : 'red'}-300`}
+                            title={team.disqualified ? 'Requalify Team' : 'Disqualify Team'}
                           >
-                            Confirm
+                            {team.disqualified ? <FaCheckCircle size={16} /> : <FaBan size={16} />}
                           </button>
-                          <button 
-                            onClick={handleCancelDisqualify}
-                            className="bg-gray-600 hover:bg-gray-700 text-white text-xs px-2 py-1 rounded"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={() => handleDisqualifyTeam(team.id)}
-                          className="text-gray-400 hover:text-red-400"
-                          title="Disqualify Team"
-                        >
-                          <FaBan size={16} />
-                        </button>
-                      )}
+                        )}
+                      </div>
                       
                       {/* Delete button */}
                       {deleteTeamId === team.id ? (
@@ -502,7 +718,7 @@ export default function AdminPanel() {
                         </div>
                       ) : (
                         <button 
-                          onClick={() => handleDeleteTeam(team.id)}
+                          onClick={() => handleConfirmDelete(team.id)}
                           className="text-gray-400 hover:text-red-400 ml-2"
                           title="Delete Team"
                         >
@@ -589,4 +805,18 @@ export default function AdminPanel() {
       </div>
     </div>
   );
+}
+
+function formatTimerDisplay(gameStatus: GameStatus) {
+  if (!gameStatus.timerStartedAt) {
+    return "10:00";
+  }
+  
+  const currentTime = gameStatus.timerPausedAt || Date.now();
+  const elapsed = currentTime - gameStatus.timerStartedAt;
+  const remaining = Math.max(0, gameStatus.timerDuration - elapsed);
+  
+  const minutes = Math.floor(remaining / 60000);
+  const seconds = Math.floor((remaining % 60000) / 1000);
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 } 

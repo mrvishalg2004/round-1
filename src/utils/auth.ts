@@ -71,8 +71,29 @@ export function getTeamInfo(): TeamInfo | null {
     const cookies = document.cookie.split(';');
     const teamCookie = cookies.find(cookie => cookie.trim().startsWith('team='));
     
+    // Try to get the stored team name
+    let storedTeamName = null;
+    if (typeof window !== 'undefined') {
+      storedTeamName = localStorage.getItem('team_name');
+    }
+    
     if (teamCookie) {
-      return JSON.parse(decodeURIComponent(teamCookie.split('=')[1]));
+      const teamInfo = JSON.parse(decodeURIComponent(teamCookie.split('=')[1]));
+      
+      // Override with stored team name if available
+      if (storedTeamName) {
+        teamInfo.name = storedTeamName;
+      }
+      
+      return teamInfo;
+    }
+    
+    // If no team cookie found but we have a team name, create a minimal team info
+    if (storedTeamName) {
+      return {
+        id: 'local-team-' + Math.random().toString(36).substring(2, 7),
+        name: storedTeamName
+      };
     }
     
     return null;

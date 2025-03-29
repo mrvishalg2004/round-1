@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import confetti from 'canvas-confetti';
 import styles from './Round1.module.css';
+import GameTimer from '@/components/GameTimer';
 
 // Create a safe confetti function in case the import fails
 const safeConfetti = (options: any) => {
@@ -37,6 +38,14 @@ export default function Round1() {
   const [isEvading, setIsEvading] = useState(false);
   const [linkPositions, setLinkPositions] = useState<Record<string, { x: number; y: number; lastMove: number }>>({});
   const [currentHoverLink, setCurrentHoverLink] = useState<string | null>(null);
+
+  const [gameStatus, setGameStatus] = useState({
+    isStarted: true,
+    timerStartedAt: null,
+    timerPausedAt: null,
+    isTimerRunning: false,
+    timerDuration: 10 * 60 * 1000
+  });
 
   // Initialize game on component mount
   useEffect(() => {
@@ -183,6 +192,17 @@ export default function Round1() {
         // If already completed, redirect to dashboard
         router.push('/dashboard');
         return;
+      }
+
+      // Fetch game status data for timer
+      try {
+        const response = await fetch('/api/admin/game-status');
+        if (response.ok) {
+          const data = await response.json();
+          setGameStatus(data);
+        }
+      } catch (error) {
+        console.error('Error fetching game status for timer:', error);
       }
       
       // Set up the real link and fake links with more deceptive content
@@ -466,115 +486,125 @@ export default function Round1() {
   }
   
   return (
-    <div className={styles.container} ref={roundRef} onMouseMove={handleMouseMove}>
-      <div className={styles.header}>
-        <h1>Round 1: Hidden Link Hunt</h1>
-        <p>Find the real link to proceed to the next round!</p>
-        <p>Attempts: {attempts}</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white relative" ref={roundRef} onMouseMove={handleMouseMove}>
+      {/* Game Timer */}
+      <GameTimer 
+        isActive={gameStatus.isTimerRunning} 
+        timerStartedAt={gameStatus.timerStartedAt}
+        timerPausedAt={gameStatus.timerPausedAt}
+        timerDuration={gameStatus.timerDuration}
+      />
       
-      <div className={styles.instructionsWrapper}>
-        <div className={styles.instructions}>
-          <p>Welcome to Round 1! Your task is to find the real link that will take you to the next round.</p>
-          <p>This is a challenge of observation and quick reflexes. The real link will try to avoid being caught!</p>
-          <p>Some links may look identical, but only one is real. It might change position, visibility, or appearance.</p>
-          <p>Good luck!</p>
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <h1>Round 1: Hidden Link Hunt</h1>
+          <p>Find the real link to proceed to the next round!</p>
+          <p>Attempts: {attempts}</p>
         </div>
-      </div>
-      
-      {!showHint && hint && (
-        <button
-          className={styles.hintButton}
-          onClick={() => setShowHint(true)}
-        >
-          Need a hint?
-        </button>
-      )}
-      
-      {showHint && hint && (
-        <div className={styles.hint}>
-          <strong>Hint:</strong> {hint}
-          {attempts > 3 && (
-            <p className="mt-2 text-sm">
-              Additional hint: When you find a suspicious link, try to click it quickly before it escapes!
-            </p>
-          )}
-        </div>
-      )}
-      
-      {errorMessage && (
-        <div className={styles.error}>
-          <div className={styles.errorIcon}>⚠️</div>
-          <div className={styles.errorContent}>
-            <div className={styles.errorTitle}>Error</div>
-            <div className={styles.errorMessage}>{errorMessage}</div>
-            {attempts > 2 && (
-              <div className={styles.errorHint}>
-                The real link might look slightly different when you hover over it.
-              </div>
-            )}
+        
+        <div className={styles.instructionsWrapper}>
+          <div className={styles.instructions}>
+            <p>Welcome to Round 1! Your task is to find the real link that will take you to the next round.</p>
+            <p>This is a challenge of observation and quick reflexes. The real link will try to avoid being caught!</p>
+            <p>Some links may look identical, but only one is real. It might change position, visibility, or appearance.</p>
+            <p>Good luck!</p>
           </div>
         </div>
-      )}
-      
-      {confirmNeeded && (
-        <div className={styles.confirmMessage}>
-          Click again to confirm and complete Round 1!
-        </div>
-      )}
-      
-      {/* Links Container */}
-      <div className={styles.links}>
-        {links.map((link) => {
-          const style: React.CSSProperties = {};
-          
-          // Apply special styling for real link
-          if (link.isReal) {
-            const pos = linkPositions[link.id];
-            
-            if (pos) {
-              style.position = 'absolute';
-              style.left = `${pos.x}px`;
-              style.top = `${pos.y}px`;
-              style.zIndex = 10;
-            }
-            
-            style.opacity = getLinkOpacity(link.id);
-            
-            // Subtle color difference that's hard to notice
-            style.backgroundColor = '#1d2736'; // Slightly different from normal #1f2937
-          }
-          
-          return (
-            <div
-              key={link.id}
-              id={link.id}
-              className={`
-                ${styles.link} 
-                ${link.isReal ? styles.realLink : ''} 
-                ${linkClicked === link.id ? styles.clicked : ''}
-              `}
-              style={style}
-              onClick={() => handleLinkClick(link.id)}
-              onMouseEnter={() => setCurrentHoverLink(link.id)}
-              onMouseLeave={() => setCurrentHoverLink(null)}
-            >
-              {link.isReal ? (
-                <span className={styles.realLinkText}>{link.content}</span>
-              ) : (
-                link.content
+        
+        {!showHint && hint && (
+          <button
+            className={styles.hintButton}
+            onClick={() => setShowHint(true)}
+          >
+            Need a hint?
+          </button>
+        )}
+        
+        {showHint && hint && (
+          <div className={styles.hint}>
+            <strong>Hint:</strong> {hint}
+            {attempts > 3 && (
+              <p className="mt-2 text-sm">
+                Additional hint: When you find a suspicious link, try to click it quickly before it escapes!
+              </p>
+            )}
+          </div>
+        )}
+        
+        {errorMessage && (
+          <div className={styles.error}>
+            <div className={styles.errorIcon}>⚠️</div>
+            <div className={styles.errorContent}>
+              <div className={styles.errorTitle}>Error</div>
+              <div className={styles.errorMessage}>{errorMessage}</div>
+              {attempts > 2 && (
+                <div className={styles.errorHint}>
+                  The real link might look slightly different when you hover over it.
+                </div>
               )}
             </div>
-          );
-        })}
-      </div>
-      
-      {loading && initialLoadComplete && (
-        <div className={styles.loadingOverlay}>
-          <div className={styles.spinner}></div>
-          <p>Processing your request...</p>
+          </div>
+        )}
+        
+        {confirmNeeded && (
+          <div className={styles.confirmMessage}>
+            Click again to confirm and complete Round 1!
+          </div>
+        )}
+        
+        {/* Links Container */}
+        <div className={styles.links}>
+          {links.map((link) => {
+            const style: React.CSSProperties = {};
+            
+            // Apply special styling for real link
+            if (link.isReal) {
+              const pos = linkPositions[link.id];
+              
+              if (pos) {
+                style.position = 'absolute';
+                style.left = `${pos.x}px`;
+                style.top = `${pos.y}px`;
+                style.zIndex = 10;
+              }
+              
+              style.opacity = getLinkOpacity(link.id);
+              
+              // Subtle color difference that's hard to notice
+              style.backgroundColor = '#1d2736'; // Slightly different from normal #1f2937
+            }
+            
+            return (
+              <div
+                key={link.id}
+                id={link.id}
+                className={`
+                  ${styles.link} 
+                  ${link.isReal ? styles.realLink : ''} 
+                  ${linkClicked === link.id ? styles.clicked : ''}
+                `}
+                style={style}
+                onClick={() => handleLinkClick(link.id)}
+                onMouseEnter={() => setCurrentHoverLink(link.id)}
+                onMouseLeave={() => setCurrentHoverLink(null)}
+              >
+                {link.isReal ? (
+                  <span className={styles.realLinkText}>{link.content}</span>
+                ) : (
+                  link.content
+                )}
+              </div>
+            );
+          })}
         </div>
-      )}
+        
+        {loading && initialLoadComplete && (
+          <div className={styles.loadingOverlay}>
+            <div className={styles.spinner}></div>
+            <p>Processing your request...</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 } 

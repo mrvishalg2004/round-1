@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { FaArrowRight, FaUnlock, FaLock, FaTrophy, FaRocket } from 'react-icons/fa';
+import { FaArrowRight, FaUnlock, FaLock, FaTrophy, FaRocket, FaStop } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { hasCompletedRound } from '@/utils/auth';
+import GameTimer from '@/components/GameTimer';
 
 interface TeamData {
   id: string;
@@ -32,9 +33,54 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [gameStatus, setGameStatus] = useState<{ 
+    isStarted: boolean;
+    timerStartedAt: number | null;
+    timerPausedAt: number | null;
+    isTimerRunning: boolean;
+    timerDuration: number;
+  }>({
+    isStarted: true,
+    timerStartedAt: null,
+    timerPausedAt: null,
+    isTimerRunning: false,
+    timerDuration: 10 * 60 * 1000
+  });
+  const [showGameStoppedNotice, setShowGameStoppedNotice] = useState(false);
   
   // For Round 1 specific view state
   const [showRound1Details, setShowRound1Details] = useState(false);
+
+  // Check game status periodically
+  useEffect(() => {
+    const checkGameStatus = async () => {
+      try {
+        const response = await fetch('/api/admin/game-status');
+        if (response.ok) {
+          const data = await response.json();
+          setGameStatus(data);
+          
+          // If game is stopped, show notice
+          if (!data.isStarted) {
+            setShowGameStoppedNotice(true);
+          } else {
+            setShowGameStoppedNotice(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking game status:', error);
+      }
+    };
+
+    // Check immediately
+    checkGameStatus();
+    
+    // Set up polling interval (every 5 seconds)
+    const interval = setInterval(checkGameStatus, 5000);
+    
+    // Cleanup interval on component unmount
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // Check if round 1 is completed via cookie
@@ -43,6 +89,9 @@ export default function Dashboard() {
     const fetchTeamData = async () => {
       setLoading(true);
       try {
+        // Try to get the team name from localStorage first
+        const storedTeamName = typeof window !== 'undefined' ? localStorage.getItem('team_name') : null;
+        
         // Fetch team data
         const response = await fetch('/api/team');
         if (response.ok) {
@@ -55,16 +104,22 @@ export default function Dashboard() {
                 round1: true
               };
             }
+            
+            // Override with localStorage team name if available
+            if (storedTeamName) {
+              data.team.name = storedTeamName;
+            }
+            
             setTeam(data.team);
             console.log('Team data:', data.team);
           } else {
             console.error('Failed to fetch team data:', data.error);
             
-            // Use fallback data based on cookies
+            // Use fallback data based on localStorage and cookies
             setTeam({
               id: 'guest-id',
-              name: 'Guest Team',
-              members: ['Guest'],
+              name: storedTeamName || 'Guest Team',
+              members: ['Player'],
               completedRounds: { round1: round1Completed },
               score: round1Completed ? 100 : 0,
               lastActive: new Date().toISOString()
@@ -73,11 +128,12 @@ export default function Dashboard() {
         } else {
           console.error('Failed to fetch team data, using fallback');
           
-          // Use fallback data based on cookies
+          // Use fallback data based on localStorage and cookies
+          const storedTeamName = typeof window !== 'undefined' ? localStorage.getItem('team_name') : null;
           setTeam({
             id: 'guest-id',
-            name: 'Guest Team',
-            members: ['Guest'],
+            name: storedTeamName || 'Guest Team',
+            members: ['Player'],
             completedRounds: { round1: round1Completed },
             score: round1Completed ? 100 : 0,
             lastActive: new Date().toISOString()
@@ -86,11 +142,12 @@ export default function Dashboard() {
       } catch (error) {
         console.error('Error fetching team data:', error);
         
-        // Use fallback data based on cookies
+        // Use fallback data based on localStorage and cookies
+        const storedTeamName = typeof window !== 'undefined' ? localStorage.getItem('team_name') : null;
         setTeam({
           id: 'guest-id',
-          name: 'Guest Team',
-          members: ['Guest'],
+          name: storedTeamName || 'Guest Team',
+          members: ['Player'],
           completedRounds: { round1: round1Completed },
           score: round1Completed ? 100 : 0,
           lastActive: new Date().toISOString()
@@ -123,8 +180,44 @@ export default function Dashboard() {
     );
   }
 
+  // Game stopped notice modal
+  if (showGameStoppedNotice) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-gray-800 p-8 rounded-lg shadow-lg border border-red-500 max-w-md w-full text-center"
+        >
+          <div className="text-red-500 text-6xl mb-4 flex justify-center">
+            <FaStop />
+          </div>
+          <h2 className="text-2xl font-bold mb-4">Game Stopped by Admin</h2>
+          <p className="text-gray-300 mb-6">
+            The game has been temporarily paused by the administrator. Your team name has been registered as <span className="font-semibold text-blue-400">{team?.name}</span>. You can come back later when the game is active.
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium"
+          >
+            Return to Home
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white relative">
+      {/* Game Timer */}
+      <GameTimer 
+        isActive={gameStatus.isTimerRunning} 
+        timerStartedAt={gameStatus.timerStartedAt}
+        timerPausedAt={gameStatus.timerPausedAt}
+        timerDuration={gameStatus.timerDuration}
+      />
+      
       <div className="container mx-auto px-4 py-12">
         <header className="mb-12 text-center">
           <h1 className="text-4xl font-bold mb-2">Team Dashboard</h1>

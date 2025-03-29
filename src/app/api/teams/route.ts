@@ -24,7 +24,9 @@ export async function GET(req: NextRequest) {
       score: team.score || 0,
       createdAt: team.createdAt || new Date().toISOString(),
       lastActive: team.lastActive || new Date().toISOString(),
-      disqualified: team.disqualified || false
+      disqualified: team.disqualified || false,
+      isWinner: team.isWinner || false,
+      isLoser: team.isLoser || false
     }));
     
     console.log('Transformed teams:', JSON.stringify(transformedTeams, null, 2));
