@@ -52,16 +52,39 @@ async function getGameStatusFromDB() {
   }
 }
 
+// Function to save game status to DB (with error handling)
+async function saveGameStatusToDB() {
+  try {
+    const { db } = await connectToDatabase();
+    await db.collection('settings').updateOne(
+      { type: 'game_status' },
+      { $set: { 
+          isStarted: cachedGameStatus.isStarted, 
+          startTime: cachedGameStatus.startTime, 
+          timerStartedAt: cachedGameStatus.timerStartedAt,
+          timerPausedAt: cachedGameStatus.timerPausedAt,
+          isTimerRunning: cachedGameStatus.isTimerRunning,
+          timerDuration: cachedGameStatus.timerDuration,
+          type: 'game_status' 
+        } 
+      },
+      { upsert: true }
+    );
+    return true;
+  } catch (error) {
+    console.error('Error saving game status to DB:', error);
+    return false; // Indicate failure but don't throw
+  }
+}
+
 export async function GET() {
   try {
     const gameStatus = await getGameStatusFromDB();
     return NextResponse.json(gameStatus);
   } catch (error) {
     console.error('Error fetching game status:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch game status' },
-      { status: 500 }
-    );
+    // Always return valid data even if DB fails
+    return NextResponse.json(cachedGameStatus);
   }
 }
 
@@ -102,28 +125,10 @@ export async function POST(request: Request) {
       cachedGameStatus.isTimerRunning = false;
     }
     
-    // Save to database
-    try {
-      const { db } = await connectToDatabase();
-      await db.collection('settings').updateOne(
-        { type: 'game_status' },
-        { $set: { 
-            isStarted: cachedGameStatus.isStarted, 
-            startTime: cachedGameStatus.startTime, 
-            timerStartedAt: cachedGameStatus.timerStartedAt,
-            timerPausedAt: cachedGameStatus.timerPausedAt,
-            isTimerRunning: cachedGameStatus.isTimerRunning,
-            timerDuration: cachedGameStatus.timerDuration,
-            type: 'game_status' 
-          } 
-        },
-        { upsert: true }
-      );
-    } catch (dbError) {
-      console.error('Error saving game status to DB:', dbError);
-      // Continue with in-memory status even if DB fails
-    }
+    // Save to database (but don't wait for it to complete)
+    saveGameStatusToDB().catch(err => console.error('Background save failed:', err));
 
+    // Always return the updated status, even if DB save fails
     return NextResponse.json(cachedGameStatus);
   } catch (error) {
     console.error('Error updating game status:', error);

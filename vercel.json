@@ -1,12 +1,13 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "framework": "nextjs",
-  "routes": [
+  "builds": [
     {
-      "src": "/(.*)",
-      "dest": "/$1"
+      "src": "package.json",
+      "use": "@vercel/next"
     }
-  ]
+  ],
+  "env": {
+    "MONGODB_URI": "mongodb+srv://rounds:rounds123@aiodysseyrounds.rr88p.mongodb.net/retryWrites=true&w=majority&appName=AIODYSSEYRounds"
+  },
+  "buildCommand": "npm run build"
 } 
