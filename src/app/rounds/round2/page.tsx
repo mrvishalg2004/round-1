@@ -90,7 +90,7 @@ export default function Round2() {
   // The missing number is the difference between the expected and actual sums
   return expectedSum - actualSum;
 }`,
-            hint: 'Array indices in JavaScript are zero-based. Also, check if you\'re calculating the sum correctly.',
+            hint: 'Array indices in JavaScript are zero-based. Also, check if you&apos;re calculating the sum correctly.',
             testCases: [
               {
                 input: '[1, 2, 4, 5]',
@@ -196,7 +196,7 @@ export default function Round2() {
             setSuccess(true);
           } else {
             // Some tests failed
-            setError('Your solution doesn\'t pass all test cases. Check the results below.');
+            setError('Your solution doesn&apos;t pass all test cases. Check the results below.');
             
             // Show hint after a few attempts
             if (attempts >= 2 && !showHint) {
@@ -228,7 +228,7 @@ export default function Round2() {
           className="bg-gradient-to-b from-green-500/20 to-green-600/20 border border-green-500 rounded-lg p-8 max-w-md text-center"
         >
           <h1 className="text-3xl font-bold mb-4">Round 2 Completed!</h1>
-          <p className="text-xl mb-6">Congratulations! You've fixed the code and completed the second challenge.</p>
+          <p className="text-xl mb-6">Congratulations! You&apos;ve fixed the code and completed the second challenge.</p>
           <button
             onClick={() => router.push('/dashboard')}
             className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-bold flex items-center justify-center"

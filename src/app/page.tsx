@@ -145,7 +145,7 @@ export default function Home() {
               </div>
               <p className="text-gray-300">
                 Crack encrypted messages using various methods of cryptography.
-                Your team's final challenge to claim victory!
+                Your team&apos;s final challenge to claim victory!
               </p>
             </motion.div>
           </div>
