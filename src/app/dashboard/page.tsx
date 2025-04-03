@@ -58,6 +58,7 @@ export default function Dashboard() {
         const response = await fetch('/api/admin/game-status');
         if (response.ok) {
           const data = await response.json();
+          console.log("[Dashboard] Fetched game status:", data);
           setGameStatus(data);
           
           // If game is stopped, show notice
@@ -75,8 +76,8 @@ export default function Dashboard() {
     // Check immediately
     checkGameStatus();
     
-    // Set up polling interval (every 5 seconds)
-    const interval = setInterval(checkGameStatus, 5000);
+    // Set up polling interval (every second for smoother timer)
+    const interval = setInterval(checkGameStatus, 1000);
     
     // Cleanup interval on component unmount
     return () => clearInterval(interval);

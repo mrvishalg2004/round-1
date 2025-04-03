@@ -62,22 +62,21 @@ export default function AdminPanel() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      // Fetch game status
-      const fetchGameStatus = async () => {
-        try {
-          const response = await fetch('/api/admin/game-status');
-          if (response.ok) {
-            const data = await response.json();
-            setGameStatus(data);
-          }
-        } catch (error) {
-          console.error('Error fetching game status:', error);
-        }
-      };
-
-      // Fetch teams
-      fetchTeams();
+      // Initial fetch of both game status and teams
       fetchGameStatus();
+      fetchTeams();
+      
+      // Set up polling interval for game status (every 1 second for timer)
+      const statusInterval = setInterval(fetchGameStatus, 1000);
+      
+      // Set up less frequent polling for teams
+      const teamsInterval = setInterval(fetchTeams, 15000);
+      
+      // Cleanup intervals on component unmount
+      return () => {
+        clearInterval(statusInterval);
+        clearInterval(teamsInterval);
+      };
     }
   }, [isAuthenticated]);
 
@@ -93,6 +92,19 @@ export default function AdminPanel() {
       console.error('Error fetching teams:', error);
     } finally {
       setTeamsLoading(false);
+    }
+  };
+
+  const fetchGameStatus = async () => {
+    try {
+      const response = await fetch('/api/admin/game-status');
+      if (response.ok) {
+        const data = await response.json();
+        console.log("[Admin] Fetched game status:", data);
+        setGameStatus(data);
+      }
+    } catch (error) {
+      console.error('Error fetching game status:', error);
     }
   };
 
@@ -808,14 +820,19 @@ export default function AdminPanel() {
 }
 
 function formatTimerDisplay(gameStatus: GameStatus) {
+  // If timer not started or explicitly reset, show initial time
   if (!gameStatus.timerStartedAt) {
-    return "10:00";
+    const minutes = Math.floor(gameStatus.timerDuration / 60000);
+    const seconds = Math.floor((gameStatus.timerDuration % 60000) / 1000);
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
   
+  // Calculate remaining time
   const currentTime = gameStatus.timerPausedAt || Date.now();
   const elapsed = currentTime - gameStatus.timerStartedAt;
   const remaining = Math.max(0, gameStatus.timerDuration - elapsed);
   
+  // Format as MM:SS
   const minutes = Math.floor(remaining / 60000);
   const seconds = Math.floor((remaining % 60000) / 1000);
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;

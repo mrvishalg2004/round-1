@@ -31,6 +31,7 @@ export default function Home() {
         const response = await fetch('/api/admin/game-status');
         if (response.ok) {
           const data = await response.json();
+          console.log("[Home] Fetched game status:", data);
           setGameStatus(data);
         }
       } catch (error) {
@@ -41,8 +42,10 @@ export default function Home() {
     // Initial fetch
     fetchGameStatus();
 
-    // Poll for game status updates every 3 seconds
-    const interval = setInterval(fetchGameStatus, 3000);
+    // Poll for game status updates every second (for smooth timer)
+    const interval = setInterval(fetchGameStatus, 1000);
+    
+    // Cleanup interval on component unmount
     return () => clearInterval(interval);
   }, []);
 

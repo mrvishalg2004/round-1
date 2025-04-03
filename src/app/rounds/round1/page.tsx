@@ -52,6 +52,31 @@ export default function Round1() {
     fetchGameStatus();
   }, []);
 
+  // After setting up the game, fetch game status for timer periodically
+  useEffect(() => {
+    const fetchTimerStatus = async () => {
+      try {
+        const response = await fetch('/api/admin/game-status');
+        if (response.ok) {
+          const data = await response.json();
+          console.log("[Round1] Fetched game status:", data);
+          setGameStatus(data);
+        }
+      } catch (error) {
+        console.error('Error fetching game status for timer:', error);
+      }
+    };
+
+    // Fetch immediately
+    fetchTimerStatus();
+    
+    // Set up polling interval (every second for timer)
+    const interval = setInterval(fetchTimerStatus, 1000);
+    
+    // Cleanup on unmount
+    return () => clearInterval(interval);
+  }, []);
+
   // Add mouse movement tracking
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!roundRef.current) return;

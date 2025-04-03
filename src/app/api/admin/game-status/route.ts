@@ -26,6 +26,7 @@ async function getGameStatusFromDB() {
         isTimerRunning: settings.isTimerRunning || false,
         timerDuration: settings.timerDuration || (10 * 60 * 1000)
       };
+      console.log("[Game Status] Loaded from DB:", cachedGameStatus);
       return cachedGameStatus;
     }
     
@@ -45,9 +46,10 @@ async function getGameStatusFromDB() {
       { upsert: true }
     );
     
+    console.log("[Game Status] Created new entry in DB:", cachedGameStatus);
     return cachedGameStatus;
   } catch (error) {
-    console.error('Error fetching game status from DB:', error);
+    console.error('[Game Status] Error fetching from DB:', error);
     return cachedGameStatus; // Fallback to cached
   }
 }
@@ -70,9 +72,10 @@ async function saveGameStatusToDB() {
       },
       { upsert: true }
     );
+    console.log("[Game Status] Saved to DB:", cachedGameStatus);
     return true;
   } catch (error) {
-    console.error('Error saving game status to DB:', error);
+    console.error('[Game Status] Error saving to DB:', error);
     return false; // Indicate failure but don't throw
   }
 }
@@ -82,7 +85,7 @@ export async function GET() {
     const gameStatus = await getGameStatusFromDB();
     return NextResponse.json(gameStatus);
   } catch (error) {
-    console.error('Error fetching game status:', error);
+    console.error('[Game Status] Error in GET:', error);
     // Always return valid data even if DB fails
     return NextResponse.json(cachedGameStatus);
   }
@@ -91,6 +94,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log("[Game Status] POST request body:", body);
     const { isStarted, startTimer, pauseTimer, resetTimer } = body;
 
     // Update game status
@@ -99,39 +103,30 @@ export async function POST(request: Request) {
       cachedGameStatus.startTime = isStarted ? new Date().toISOString() : null;
     }
 
-    // Handle timer actions
+    // Simplified timer logic for better reliability
     if (startTimer) {
-      const now = Date.now();
-      // If timer was paused, we need to adjust the start time to account for the pause duration
-      if (cachedGameStatus.timerPausedAt && !cachedGameStatus.isTimerRunning) {
-        const pauseDuration = now - cachedGameStatus.timerPausedAt;
-        if (cachedGameStatus.timerStartedAt) {
-          cachedGameStatus.timerStartedAt = cachedGameStatus.timerStartedAt + pauseDuration;
-        } else {
-          cachedGameStatus.timerStartedAt = now;
-        }
-      } else if (!cachedGameStatus.timerStartedAt) {
-        // If timer was never started
-        cachedGameStatus.timerStartedAt = now;
-      }
+      cachedGameStatus.timerStartedAt = Date.now();
       cachedGameStatus.timerPausedAt = null;
       cachedGameStatus.isTimerRunning = true;
+      console.log("[Game Status] Timer started:", cachedGameStatus);
     } else if (pauseTimer) {
       cachedGameStatus.timerPausedAt = Date.now();
       cachedGameStatus.isTimerRunning = false;
+      console.log("[Game Status] Timer paused:", cachedGameStatus);
     } else if (resetTimer) {
       cachedGameStatus.timerStartedAt = null;
       cachedGameStatus.timerPausedAt = null;
       cachedGameStatus.isTimerRunning = false;
+      console.log("[Game Status] Timer reset:", cachedGameStatus);
     }
     
     // Save to database (but don't wait for it to complete)
-    saveGameStatusToDB().catch(err => console.error('Background save failed:', err));
+    saveGameStatusToDB().catch(err => console.error('[Game Status] Background save failed:', err));
 
     // Always return the updated status, even if DB save fails
     return NextResponse.json(cachedGameStatus);
   } catch (error) {
-    console.error('Error updating game status:', error);
+    console.error('[Game Status] Error in POST:', error);
     return NextResponse.json(
       { error: 'Failed to update game status' },
       { status: 500 }

@@ -22,47 +22,85 @@ export default function GameTimer({
   const [isWarning, setIsWarning] = useState(false);
   const [isDanger, setIsDanger] = useState(false);
 
+  // Add debug logging to track props changes
   useEffect(() => {
+    console.log("[GameTimer] Props updated:", { 
+      isActive, 
+      timerStartedAt, 
+      timerPausedAt, 
+      timerDuration,
+      isVisible
+    });
+  }, [isActive, timerStartedAt, timerPausedAt, timerDuration, isVisible]);
+
+  // Always show timer if it's active or has been active
+  useEffect(() => {
+    if (isActive) {
+      setIsVisible(true);
+    }
+  }, [isActive]);
+
+  // Timer update logic
+  useEffect(() => {
+    // Safety check - only run timer if we have valid data
     if (isActive && timerStartedAt) {
+      console.log("[GameTimer] Starting interval timer");
       setIsVisible(true);
       
       const interval = setInterval(() => {
-        // If paused, use the pause time for calculation
-        // Otherwise use current time
+        // Get current time for calculation
         const currentTime = timerPausedAt || Date.now();
         const elapsed = currentTime - timerStartedAt;
         const remaining = Math.max(0, timerDuration - elapsed);
         
+        // Update timer state
         setTimeRemaining(remaining);
         
-        // Set warning at 3 minutes
+        // Set warning colors
         setIsWarning(remaining <= 3 * 60 * 1000 && remaining > 1 * 60 * 1000);
-        
-        // Set danger at 1 minute
         setIsDanger(remaining <= 1 * 60 * 1000);
+        
+        // Log current time remaining
+        if (remaining % 10000 < 1000) { // Log roughly every 10 seconds
+          console.log("[GameTimer] Time remaining:", formatTime(remaining));
+        }
         
         // Stop timer when it reaches zero
         if (remaining <= 0) {
+          console.log("[GameTimer] Timer reached zero");
           clearInterval(interval);
         }
       }, 1000);
       
-      return () => clearInterval(interval);
+      return () => {
+        console.log("[GameTimer] Clearing interval timer");
+        clearInterval(interval);
+      };
     } else if (!isActive && timerStartedAt === null) {
       // Reset timer when not active and no start time
+      console.log("[GameTimer] Resetting timer");
       setTimeRemaining(timerDuration);
       setIsWarning(false);
       setIsDanger(false);
-      setIsVisible(false);
     }
   }, [isActive, timerStartedAt, timerPausedAt, timerDuration]);
 
-  if (!isVisible) return null;
+  // Helper function to format time
+  const formatTime = (ms: number) => {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   // Format time as MM:SS
   const minutes = Math.floor(timeRemaining / 60000);
   const seconds = Math.floor((timeRemaining % 60000) / 1000);
   const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+  // Don't render anything if not visible
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <motion.div
